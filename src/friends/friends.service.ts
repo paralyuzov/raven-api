@@ -47,15 +47,29 @@ export class FriendsService {
           );
         }
       }
-      // If friendship was rejected or blocked, allow new request
       await this.friendModel.deleteOne({ _id: existingFriendship._id });
     }
 
-    // Create new friendship
     return this.friendModel.create({
       userId: data.userId,
       friendId: data.receiverId,
       status: FriendStatus.PENDING,
     });
+  }
+  async acceptFriendRequest(data: FriendRequestDto): Promise<Friend> {
+    const friendRequest = await this.friendModel.findOne({
+      userId: data.receiverId,
+      friendId: data.userId,
+      status: FriendStatus.PENDING,
+    });
+
+    if (!friendRequest) {
+      throw new NotFoundException('Friend request not found');
+    }
+
+    friendRequest.status = FriendStatus.ACCEPTED;
+    await friendRequest.save();
+
+    return friendRequest;
   }
 }
