@@ -18,4 +18,15 @@ export class FriendsController {
       receiverId,
     });
   }
+
+  @Post('accept-request')
+  async acceptFriendRequest(
+    @GetUser('_id') userId: string,
+    @Body('friendId') friendId: string,
+  ) {
+    return this.friendsService.acceptFriendRequest({
+      userId,
+      receiverId: friendId,
+    });
+  }
 }
