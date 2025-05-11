@@ -12,5 +12,6 @@ import { User, UserSchema } from 'src/auth/schemas/user.schema';
   ],
   controllers: [FriendsController],
   providers: [FriendsService],
+  exports: [FriendsService],
 })
 export class FriendsModule {}
