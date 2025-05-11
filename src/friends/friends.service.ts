@@ -27,33 +27,51 @@ export class FriendsService {
       throw new BadRequestException(`You cannot add yourself as a friend`);
     }
 
-    const existingFriendship = await this.friendModel.findOne({
-      $or: [
-        { userId: data.userId, friendId: data.receiverId },
-        { userId: data.receiverId, friendId: data.userId },
-      ],
-    });
+    const existingFriendship = await this.getExistingFriendship(
+      data.userId,
+      data.receiverId,
+    );
 
     if (existingFriendship) {
-      if (existingFriendship.status === FriendStatus.ACCEPTED) {
-        throw new ConflictException('You are already friends with this user');
-      } else if (existingFriendship.status === FriendStatus.PENDING) {
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
-        if (existingFriendship.userId.toString() === data.userId) {
-          throw new ConflictException('Friend request already sent');
-        } else {
-          throw new ConflictException(
-            'This user has already sent you a friend request',
-          );
-        }
-      }
-      await this.friendModel.deleteOne({ _id: existingFriendship._id });
+      await this.handleExistingFriendship(existingFriendship, data.userId);
     }
 
     return this.friendModel.create({
       userId: data.userId,
       friendId: data.receiverId,
       status: FriendStatus.PENDING,
+    });
+  }
+
+  private async handleExistingFriendship(
+    friendship: Friend,
+    requesterId: string,
+  ): Promise<void> {
+    if (friendship.status === FriendStatus.ACCEPTED) {
+      throw new ConflictException('You are already friends with this user');
+    } else if (friendship.status === FriendStatus.PENDING) {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      if (friendship.userId.toString() === requesterId) {
+        throw new ConflictException('Friend request already sent');
+      } else {
+        throw new ConflictException(
+          'This user has already sent you a friend request',
+        );
+      }
+    }
+
+    await this.friendModel.deleteOne({ _id: friendship._id });
+  }
+
+  private async getExistingFriendship(
+    userId: string,
+    friendId: string,
+  ): Promise<Friend | null> {
+    return this.friendModel.findOne({
+      $or: [
+        { userId: userId, friendId: friendId },
+        { userId: friendId, friendId: userId },
+      ],
     });
   }
   async acceptFriendRequest(data: FriendRequestDto): Promise<Friend> {
@@ -87,5 +105,16 @@ export class FriendsService {
     await this.friendModel.deleteOne({ _id: friendRequest._id });
 
     return friendRequest;
+  }
+
+  async areFriends(userId: string, friendId: string): Promise<boolean> {
+    const friendship = await this.friendModel.findOne({
+      $or: [
+        { userId, friendId, status: FriendStatus.ACCEPTED },
+        { userId: friendId, friendId: userId, status: FriendStatus.ACCEPTED },
+      ],
+    });
+
+    return !!friendship;
   }
 }
