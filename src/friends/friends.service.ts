@@ -72,4 +72,20 @@ export class FriendsService {
 
     return friendRequest;
   }
+
+  async rejectFriendRequest(data: FriendRequestDto): Promise<Friend> {
+    const friendRequest = await this.friendModel.findOne({
+      userId: data.receiverId,
+      friendId: data.userId,
+      status: FriendStatus.PENDING,
+    });
+
+    if (!friendRequest) {
+      throw new NotFoundException('Friend request not found');
+    }
+
+    await this.friendModel.deleteOne({ _id: friendRequest._id });
+
+    return friendRequest;
+  }
 }
