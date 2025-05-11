@@ -2,7 +2,7 @@ import { Injectable, ForbiddenException } from '@nestjs/common';
 import { Message } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { FriendsService } from 'src/friends/friends.service';
+import { FriendsService } from '../friends/friends.service';
 
 @Injectable()
 export class MessagesService {
