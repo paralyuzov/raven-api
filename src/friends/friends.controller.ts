@@ -29,4 +29,15 @@ export class FriendsController {
       receiverId: friendId,
     });
   }
+
+  @Post('reject-request')
+  async rejectFriendRequest(
+    @GetUser('_id') userId: string,
+    @Body('friendId') friendId: string,
+  ) {
+    return this.friendsService.rejectFriendRequest({
+      userId,
+      receiverId: friendId,
+    });
+  }
 }
