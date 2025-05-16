@@ -7,6 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MessagesModule } from './messages/messages.module';
 import { FriendsModule } from './friends/friends.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { FriendsModule } from './friends/friends.module';
     AuthModule,
     MessagesModule,
     FriendsModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

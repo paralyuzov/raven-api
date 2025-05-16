@@ -117,4 +117,24 @@ export class FriendsService {
 
     return !!friendship;
   }
+
+  async getFriendIds(userId: string): Promise<string[]> {
+    const friends = await this.friendModel
+      .find({
+        $or: [
+          { userId, status: FriendStatus.ACCEPTED },
+          { friendId: userId, status: FriendStatus.ACCEPTED },
+        ],
+      })
+      .select('userId friendId -_id')
+      .lean();
+
+    return friends.map((friendship) => {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      const userIdStr = friendship.userId.toString();
+
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      return userIdStr === userId ? friendship.friendId.toString() : userIdStr;
+    });
+  }
 }
