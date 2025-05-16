@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { AuthGuard } from '../guards/auth.guard';
 import { GetUser } from '../decorators/get-user.decorator';
@@ -44,5 +44,18 @@ export class FriendsController {
   @Get('get-friends')
   async getFriends(@GetUser('_id') userId: string) {
     return this.friendsService.getFriendIds(userId);
+  }
+
+  @Get('search-users')
+  async searchUsers(
+    @GetUser('_id') userId: string,
+    @Query('query') query: string,
+  ) {
+    return this.friendsService.searchUsers(userId, query);
+  }
+
+  @Get('pending-requests')
+  async getPendingRequests(@GetUser('_id') userId: string) {
+    return this.friendsService.getPendingFriendRequests(userId);
   }
 }
