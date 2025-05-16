@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { AuthGuard } from '../guards/auth.guard';
 import { GetUser } from '../decorators/get-user.decorator';
@@ -39,5 +39,10 @@ export class FriendsController {
       userId,
       receiverId: friendId,
     });
+  }
+
+  @Get('get-friends')
+  async getFriends(@GetUser('_id') userId: string) {
+    return this.friendsService.getFriendIds(userId);
   }
 }
