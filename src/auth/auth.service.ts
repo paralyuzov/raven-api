@@ -75,7 +75,18 @@ export class AuthService {
 
     await this.userModel.findByIdAndUpdate(user._id, { isOnline: true });
 
-    return this.generateToken(String(user._id));
+    const tokens = await this.generateToken(String(user._id));
+    return {
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        nickname: user.nickname,
+        email: user.email,
+        avatar: user.avatar || '',
+      },
+      ...tokens,
+    };
   }
 
   async refreshToken(token: string) {
