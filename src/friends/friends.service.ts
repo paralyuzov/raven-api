@@ -137,4 +137,78 @@ export class FriendsService {
       return userIdStr === userId ? friendship.friendId.toString() : userIdStr;
     });
   }
+
+  async searchUsers(currentUserId: string, query: string) {
+    if (!query || query.length < 2) {
+      return [];
+    }
+
+    const searchRegex = new RegExp(query, 'i');
+
+    const users = await this.userModel
+      .find(
+        {
+          $and: [
+            { _id: { $ne: currentUserId } },
+            {
+              $or: [
+                { username: searchRegex },
+                { email: searchRegex },
+                { firstName: searchRegex },
+                { lastName: searchRegex },
+              ],
+            },
+          ],
+        },
+        {
+          _id: 1,
+          username: 1,
+          email: 1,
+          firstName: 1,
+          lastName: 1,
+          avatar: 1,
+        },
+      )
+      .lean();
+
+    const foundUserIds = users.map((user) => user._id);
+    const existingFriendships = await this.friendModel
+      .find({
+        $or: [
+          { userId: currentUserId, friendId: { $in: foundUserIds } },
+          { friendId: currentUserId, userId: { $in: foundUserIds } },
+        ],
+      })
+      .lean();
+    return users.map((user) => {
+      const friendship = existingFriendships.find(
+        (f) =>
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
+          (f.userId.toString() === currentUserId &&
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            f.friendId.toString() === user._id.toString()) ||
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
+          (f.friendId.toString() === currentUserId &&
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
+            f.userId.toString() === user._id.toString()),
+      );
+
+      return {
+        ...user,
+        friendshipStatus: friendship ? friendship.status : null,
+      };
+    });
+  }
+
+  async getPendingFriendRequests(userId: string): Promise<Friend[]> {
+    const pendingRequests = await this.friendModel
+      .find({
+        friendId: userId,
+        status: FriendStatus.PENDING,
+      })
+      .populate('userId', 'username email firstName lastName avatar')
+      .lean();
+
+    return pendingRequests;
+  }
 }
