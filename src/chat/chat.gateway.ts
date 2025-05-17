@@ -170,4 +170,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       senderId,
     });
   }
+
+  @OnEvent('friendship.updated')
+  handleFriendshipUpdated(payload: { user1: string; user2: string }): void {
+    const { user1, user2 } = payload;
+
+    this.logger.log(`Friendship established between ${user1} and ${user2}`);
+
+    this.server
+      .to(`user:${user1}`)
+      .emit('friendship_updated', { friendId: user2 });
+    this.server
+      .to(`user:${user2}`)
+      .emit('friendship_updated', { friendId: user1 });
+  }
 }

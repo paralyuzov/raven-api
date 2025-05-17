@@ -97,6 +97,10 @@ export class FriendsService {
 
     friendRequest.status = FriendStatus.ACCEPTED;
     await friendRequest.save();
+    this.eventEmitter.emit('friendship.updated', {
+      user1: data.userId,
+      user2: data.receiverId,
+    });
 
     return friendRequest;
   }
