@@ -43,7 +43,7 @@ export class FriendsController {
 
   @Get('get-friends')
   async getFriends(@GetUser('_id') userId: string) {
-    return this.friendsService.getFriendIds(userId);
+    return this.friendsService.getFriendsWithDetails(userId);
   }
 
   @Get('search-users')
