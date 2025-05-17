@@ -8,6 +8,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MessagesModule } from './messages/messages.module';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ChatModule } from './chat/chat.module';
         uri: configService.get<string>('MONGODB_URI'),
       }),
     }),
+    EventEmitterModule.forRoot(),
     AuthModule,
     MessagesModule,
     FriendsModule,
