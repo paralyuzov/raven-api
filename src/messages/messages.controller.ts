@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { GetUser } from 'src/decorators/get-user.decorator';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { CreateMessageDto } from './dto/create.dto';
@@ -20,5 +20,14 @@ export class MessagesController {
       messageDto.content,
       messageDto.type,
     );
+  }
+
+  @Get('get-messages')
+  async getMessages(
+    @GetUser('_id') userId: string,
+    @Query('friendId') friendId: string,
+  ) {
+    console.log(`Fetching messages between ${userId} and ${friendId}`);
+    return this.messageService.getMessages(userId, friendId);
   }
 }
