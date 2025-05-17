@@ -33,4 +33,21 @@ export class MessagesService {
       type,
     });
   }
+
+  async getMessages(userId: string, friendId: string): Promise<Message[]> {
+    const areFriends = await this.friendsService.areFriends(userId, friendId);
+
+    if (!areFriends) {
+      throw new ForbiddenException('You can only view messages with friends');
+    }
+
+    return this.messageModel
+      .find({
+        $or: [
+          { senderId: userId, receiverId: friendId },
+          { senderId: friendId, receiverId: userId },
+        ],
+      })
+      .sort({ createdAt: 1 });
+  }
 }
