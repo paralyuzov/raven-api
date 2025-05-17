@@ -9,12 +9,14 @@ import { Model } from 'mongoose';
 import { Friend, FriendStatus } from './schemas/friend.schema';
 import { User } from '../auth/schemas/user.schema';
 import { FriendRequestDto } from './dto/friend-request.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class FriendsService {
   constructor(
     @InjectModel(Friend.name) private friendModel: Model<Friend>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async sendFriendRequest(data: FriendRequestDto): Promise<Friend> {
@@ -36,11 +38,19 @@ export class FriendsService {
       await this.handleExistingFriendship(existingFriendship, data.userId);
     }
 
-    return this.friendModel.create({
+    const friendRequest = await this.friendModel.create({
       userId: data.userId,
       friendId: data.receiverId,
       status: FriendStatus.PENDING,
     });
+
+    this.eventEmitter.emit('friend.request.created', {
+      type: 'FRIEND_REQUEST',
+      receiverId: data.receiverId,
+      senderId: data.userId,
+    });
+
+    return friendRequest;
   }
 
   private async handleExistingFriendship(
@@ -210,5 +220,24 @@ export class FriendsService {
       .lean();
 
     return pendingRequests;
+  }
+
+  async getFriendsWithDetails(userId: string) {
+    const friendIds = await this.getFriendIds(userId);
+    const friendUsers = await this.userModel
+      .find(
+        { _id: { $in: friendIds } },
+        {
+          _id: 1,
+          firstName: 1,
+          lastName: 1,
+          email: 1,
+          username: 1,
+          avatar: 1,
+        },
+      )
+      .lean();
+
+    return friendUsers;
   }
 }
