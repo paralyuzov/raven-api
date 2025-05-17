@@ -11,7 +11,7 @@ import { Server, Socket } from 'socket.io';
 
 import { Logger, UseGuards, ForbiddenException } from '@nestjs/common';
 import { WsAuthGuard } from '../guards/ws-auth.guard';
-
+import { OnEvent } from '@nestjs/event-emitter';
 interface AuthenticatedSocket extends Socket {
   data: {
     userId: string;
@@ -103,6 +103,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const messageData = {
           id: message._id,
           senderId,
+          receiverId,
           content,
           type,
           timestamp: new Date(),
@@ -150,5 +151,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (error) {
       this.logger.error(`Error notifying friends of status change: ${error}`);
     }
+  }
+
+  @OnEvent('friend.request.created')
+  handleFriendRequestCreated(payload: {
+    type: string;
+    receiverId: string;
+    senderId: string;
+  }): void {
+    const { receiverId, senderId } = payload;
+
+    this.logger.log(
+      `Friend request created: notifying user ${receiverId} to refresh requests`,
+    );
+
+    this.server.to(`user:${receiverId}`).emit('refresh_friend_requests', {
+      action: 'FRIEND_REQUEST_RECEIVED',
+      senderId,
+    });
   }
 }
