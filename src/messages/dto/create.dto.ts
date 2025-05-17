@@ -9,6 +9,6 @@ export class CreateMessageDto {
   @IsNotEmpty()
   content: string;
 
-  @IsEnum(['text', 'image', 'video'])
+  @IsEnum(['text', 'image', 'video', 'gif'])
   type: string = 'text';
 }

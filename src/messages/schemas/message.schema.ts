@@ -12,7 +12,7 @@ export class Message extends Document {
   @Prop({ required: true })
   content: string;
 
-  @Prop({ required: true, enum: ['text', 'image', 'video'] })
+  @Prop({ required: true, enum: ['text', 'image', 'video', 'gif'] })
   type: string;
 }
 export const MessageSchema = SchemaFactory.createForClass(Message);
