@@ -14,5 +14,8 @@ export class Message extends Document {
 
   @Prop({ required: true, enum: ['text', 'image', 'video', 'gif'] })
   type: string;
+
+  @Prop({ default: false })
+  read: boolean;
 }
 export const MessageSchema = SchemaFactory.createForClass(Message);
