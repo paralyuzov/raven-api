@@ -30,4 +30,9 @@ export class MessagesController {
     console.log(`Fetching messages between ${userId} and ${friendId}`);
     return this.messageService.getMessages(userId, friendId);
   }
+
+  @Get('unread')
+  async getUnreadMessages(@GetUser('_id') userId: string) {
+    return this.messageService.getUnreadMessageCounts(userId);
+  }
 }
