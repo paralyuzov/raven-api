@@ -26,12 +26,14 @@ export class MessagesService {
       throw new ForbiddenException('You can only send messages to friends');
     }
 
-    return this.messageModel.create({
+    const message = await this.messageModel.create({
       senderId,
       receiverId,
       content,
       type,
     });
+
+    return message;
   }
 
   async getMessages(userId: string, friendId: string): Promise<Message[]> {
@@ -49,5 +51,37 @@ export class MessagesService {
         ],
       })
       .sort({ createdAt: 1 });
+  }
+
+  async markMessagesAsRead(userId: string, senderId: string) {
+    return this.messageModel.updateMany(
+      { receiverId: userId, senderId: senderId },
+      { $set: { read: true } },
+    );
+  }
+
+  async getUnreadMessageCounts(userId: string) {
+    const unreadMessages = await this.messageModel.aggregate([
+      {
+        $match: {
+          receiverId: userId,
+          read: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$senderId',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const result = {};
+    unreadMessages.forEach((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      result[item._id] = item.count;
+    });
+
+    return result;
   }
 }
