@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -29,5 +29,21 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async logout(@GetUser('_id') userId: string) {
     return this.authService.logout(userId);
+  }
+
+  @Get('verify')
+  @UseGuards(AuthGuard)
+  async verifyToken(@GetUser('_id') userId: string) {
+    const user = await this.authService.getUserById(userId);
+    return {
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        nickname: user.nickname,
+        email: user.email,
+        avatar: user.avatar || '',
+      },
+    };
   }
 }
