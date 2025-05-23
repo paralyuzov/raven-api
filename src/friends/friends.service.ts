@@ -238,6 +238,7 @@ export class FriendsService {
           email: 1,
           username: 1,
           avatar: 1,
+          isOnline: 1,
         },
       )
       .lean();
