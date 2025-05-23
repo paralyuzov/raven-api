@@ -126,4 +126,12 @@ export class AuthService {
     await this.refreshTokenModel.deleteOne({ userId });
     return { message: 'Logged out successfully' };
   }
+
+  async getUserById(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
 }
