@@ -1,34 +1,41 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
-import { Message } from './schemas/message.schema';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Message, MessageType } from './schemas/message.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { FriendsService } from '../friends/friends.service';
+import { Conversation } from '../conversation/schemas/conversation.schema';
 
 @Injectable()
 export class MessagesService {
   constructor(
     @InjectModel(Message.name) private messageModel: Model<Message>,
-    private readonly friendsService: FriendsService,
+    @InjectModel(Conversation.name)
+    private conversationModel: Model<Conversation>,
   ) {}
 
   async createMessage(
     senderId: string,
-    receiverId: string,
+    conversationId: string,
     content: string,
-    type: string = 'text',
+    type: MessageType = MessageType.TEXT,
   ): Promise<Message> {
-    const areFriends = await this.friendsService.areFriends(
-      senderId,
-      receiverId,
-    );
-
-    if (!areFriends) {
-      throw new ForbiddenException('You can only send messages to friends');
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    if (!conversation.participants.some((id) => id.toString() === senderId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
     }
 
     const message = await this.messageModel.create({
+      conversationId,
       senderId,
-      receiverId,
       content,
       type,
     });
@@ -36,52 +43,28 @@ export class MessagesService {
     return message;
   }
 
-  async getMessages(userId: string, friendId: string): Promise<Message[]> {
-    const areFriends = await this.friendsService.areFriends(userId, friendId);
-
-    if (!areFriends) {
-      throw new ForbiddenException('You can only view messages with friends');
+  async getMessages(
+    conversationId: string,
+    userId: string,
+  ): Promise<Message[]> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    if (!conversation.participants.some((id) => id.toString() === userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
     }
 
-    return this.messageModel
-      .find({
-        $or: [
-          { senderId: userId, receiverId: friendId },
-          { senderId: friendId, receiverId: userId },
-        ],
-      })
-      .sort({ createdAt: 1 });
+    return this.messageModel.find({ conversationId }).sort({ createdAt: 1 });
   }
 
-  async markMessagesAsRead(userId: string, senderId: string) {
+  async markMessagesAsRead(conversationId: string, userId: string) {
     return this.messageModel.updateMany(
-      { receiverId: userId, senderId: senderId },
+      { conversationId, senderId: { $ne: userId }, read: false },
       { $set: { read: true } },
     );
-  }
-
-  async getUnreadMessageCounts(userId: string) {
-    const unreadMessages = await this.messageModel.aggregate([
-      {
-        $match: {
-          receiverId: userId,
-          read: false,
-        },
-      },
-      {
-        $group: {
-          _id: '$senderId',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const result = {};
-    unreadMessages.forEach((item) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      result[item._id] = item.count;
-    });
-
-    return result;
   }
 }
