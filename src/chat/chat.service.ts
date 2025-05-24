@@ -1,7 +1,13 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Message } from '../messages/schemas/message.schema';
+import { Message, MessageType } from '../messages/schemas/message.schema';
+import { Conversation } from '../conversation/schemas/conversation.schema';
 import { FriendsService } from 'src/friends/friends.service';
 
 @Injectable()
@@ -11,6 +17,8 @@ export class ChatService {
 
   constructor(
     @InjectModel(Message.name) private messageModel: Model<Message>,
+    @InjectModel(Conversation.name)
+    private conversationModel: Model<Conversation>,
     private readonly friendService: FriendsService,
   ) {}
 
@@ -27,31 +35,48 @@ export class ChatService {
     }
   }
 
+  isUserOnline(userId: string): boolean {
+    return this.connectedUsers.has(userId);
+  }
+
+  // Join a conversation: check if user is a participant
+  async joinConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<Conversation> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    if (!conversation.participants.some((id) => id.toString() === userId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+    return conversation;
+  }
+
+  // Send a message in a conversation
   async sendMessage(
     senderId: string,
-    receiverId: string,
+    conversationId: string,
     content: string,
-    type: string = 'text',
+    type: MessageType = MessageType.TEXT,
   ): Promise<Message> {
-    const areFriends = await this.friendService.areFriends(
-      senderId,
-      receiverId,
-    );
-    if (!areFriends) {
-      throw new ForbiddenException('You can only send messages to friends');
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    if (!conversation.participants.some((id) => id.toString() === senderId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
     }
     const message = await this.messageModel.create({
+      conversationId,
       senderId,
-      receiverId,
       content,
       type,
     });
-
     return message;
-  }
-
-  isUserOnline(userId: string): boolean {
-    return this.connectedUsers.has(userId);
   }
 
   async getOnlineFriendIds(userId: string): Promise<string[]> {
