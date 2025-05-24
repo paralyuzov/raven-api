@@ -4,25 +4,26 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
-  WsException,
 } from '@nestjs/websockets';
 import { ChatService } from './chat.service';
 import { Server, Socket } from 'socket.io';
-
-import { Logger, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Logger,
+  UseGuards,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { WsAuthGuard } from '../guards/ws-auth.guard';
 import { OnEvent } from '@nestjs/event-emitter';
+import { MessageType } from '../messages/schemas/message.schema';
+
 interface AuthenticatedSocket extends Socket {
   data: {
     userId: string;
   };
 }
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-})
+@WebSocketGateway({ namespace: '/chat', cors: { origin: '*' } })
 @UseGuards(WsAuthGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -37,119 +38,101 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket): Promise<void> {
     try {
       const userId = await this.wsAuthGuard.validateToken(client);
-
       client.data = { userId };
       this.chatService.registerUser(userId, client.id);
       await client.join(`user:${userId}`);
       this.logger.log(`Client connected: ${userId} (${client.id})`);
     } catch (error) {
-      if (error instanceof WsException) {
-        this.disconnect(client, error.message);
-      } else {
-        this.logger.error('Unexpected connection error', error);
-        this.disconnect(client, 'Server error during authentication');
-      }
+      this.logger.error('Connection error', error);
+      client.disconnect();
     }
   }
 
-  async handleDisconnect(client: Socket): Promise<void> {
+  handleDisconnect(client: Socket): void {
     try {
-      const userId = await this.wsAuthGuard.validateToken(client);
-
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const userId = client.data?.userId;
       if (userId) {
         this.chatService.removeUser(userId);
         this.logger.log(`Client disconnected: ${userId} (${client.id})`);
-        await this.notifyFriendsOfStatus(userId, false);
       }
     } catch (error) {
       this.logger.error('Error handling disconnect', error);
     }
   }
 
-  private disconnect(client: Socket, reason: string): void {
-    this.logger.log(`Disconnecting client ${client.id}: ${reason}`);
-    client.emit('error', { message: reason });
-    client.disconnect(true);
+  @SubscribeMessage('join_conversation')
+  async handleJoinConversation(
+    client: AuthenticatedSocket,
+    payload: { conversationId: string },
+  ): Promise<void> {
+    const userId = client.data.userId;
+    const { conversationId } = payload;
+    try {
+      await this.chatService.joinConversation(conversationId, userId);
+      await client.join(`conversation:${conversationId}`);
+      client.emit('joined_conversation', { conversationId });
+      this.logger.log(`User ${userId} joined conversation ${conversationId}`);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      client.emit('error', { message: error.message });
+    }
   }
 
   @SubscribeMessage('send_message')
   async handleSendMessage(
     client: AuthenticatedSocket,
-    payload: { receiverId: string; content: string; type?: string },
+    payload: { conversationId: string; content: string; type?: string },
   ): Promise<void> {
-    try {
-      const senderId = client.data.userId;
-
-      if (!senderId) {
-        client.emit('error', { message: 'Unauthorized' });
-        return;
-      }
-
-      const { receiverId, content, type = 'text' } = payload;
-
-      if (!receiverId || !content) {
-        client.emit('error', { message: 'Invalid message format' });
-        return;
-      }
-
-      try {
-        const message = await this.chatService.sendMessage(
-          senderId,
-          receiverId,
-          content,
-          type,
-        );
-
-        const messageData = {
-          id: message._id,
-          senderId,
-          receiverId,
-          content,
-          type,
-          timestamp: new Date(),
-        };
-
-        this.server.to(`user:${receiverId}`).emit('new_message', messageData);
-
-        client.emit('message_sent', {
-          id: message._id,
-          receiverId,
-          delivered: this.chatService.isUserOnline(receiverId),
-          timestamp: new Date(),
-        });
-      } catch (serviceError) {
-        if (serviceError instanceof ForbiddenException) {
-          client.emit('error', {
-            code: 'NOT_FRIENDS',
-            message: serviceError.message,
-          });
-        } else {
-          throw serviceError;
-        }
-      }
-    } catch (error) {
-      this.logger.error('Error sending message', error);
-      client.emit('error', { message: 'Failed to send message' });
+    const senderId = client.data.userId;
+    const { conversationId, content, type } = payload;
+    if (!conversationId || !content) {
+      client.emit('error', { message: 'Invalid message format' });
+      return;
     }
-  }
-
-  private async notifyFriendsOfStatus(
-    userId: string,
-    isOnline: boolean,
-  ): Promise<void> {
     try {
-      const onlineFriendIds = await this.chatService.getOnlineFriendIds(userId);
-      const statusUpdate = {
-        userId: userId,
-        status: isOnline ? 'online' : 'offline',
-        timestamp: new Date(),
-      };
+      const messageType: MessageType = Object.values(MessageType).includes(
+        type as MessageType,
+      )
+        ? (type as MessageType)
+        : MessageType.TEXT;
 
-      onlineFriendIds.forEach((friendId) => {
-        this.server.to(`user:${friendId}`).emit('friend_status', statusUpdate);
+      const message = await this.chatService.sendMessage(
+        senderId,
+        conversationId,
+        content,
+        messageType,
+      );
+      const messageData = {
+        id: message._id,
+        conversationId,
+        senderId,
+        content,
+        type: message.type,
+        timestamp: message.createdAt
+          ? new Date(message.createdAt).toISOString()
+          : undefined,
+      };
+      this.server
+        .to(`conversation:${conversationId}`)
+        .emit('new_message', messageData);
+      client.emit('message_sent', {
+        id: message._id,
+        conversationId,
+        timestamp: message.createdAt
+          ? new Date(message.createdAt).toISOString()
+          : undefined,
       });
     } catch (error) {
-      this.logger.error(`Error notifying friends of status change: ${error}`);
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+      ) {
+        client.emit('error', { message: error.message });
+      } else {
+        this.logger.error('Error sending message', error);
+        client.emit('error', { message: 'Failed to send message' });
+      }
     }
   }
 
@@ -183,5 +166,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server
       .to(`user:${user2}`)
       .emit('friendship_updated', { friendId: user1 });
+  }
+
+  initializeSocketEvents(socket: Socket): void {
+    socket.on('connect', () => console.log('Socket connected'));
+    socket.on('disconnect', () => console.log('Socket disconnected'));
+    socket.on('connect_error', (err) =>
+      console.error('Socket connect error:', err),
+    );
   }
 }
