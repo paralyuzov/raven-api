@@ -1,14 +1,15 @@
 import { IsEnum, IsMongoId, IsNotEmpty, IsString } from 'class-validator';
+import { MessageType } from '../schemas/message.schema';
 
 export class CreateMessageDto {
   @IsMongoId()
   @IsNotEmpty()
-  receiverId: string;
+  conversationId: string;
 
   @IsString()
   @IsNotEmpty()
   content: string;
 
-  @IsEnum(['text', 'image', 'video', 'gif'])
-  type: string = 'text';
+  @IsEnum(MessageType)
+  type: MessageType = MessageType.TEXT;
 }
