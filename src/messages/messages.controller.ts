@@ -16,7 +16,7 @@ export class MessagesController {
   ) {
     return this.messageService.createMessage(
       userId,
-      messageDto.receiverId,
+      messageDto.conversationId,
       messageDto.content,
       messageDto.type,
     );
@@ -25,14 +25,8 @@ export class MessagesController {
   @Get('get-messages')
   async getMessages(
     @GetUser('_id') userId: string,
-    @Query('friendId') friendId: string,
+    @Query('conversationId') conversationId: string,
   ) {
-    console.log(`Fetching messages between ${userId} and ${friendId}`);
-    return this.messageService.getMessages(userId, friendId);
-  }
-
-  @Get('unread')
-  async getUnreadMessages(@GetUser('_id') userId: string) {
-    return this.messageService.getUnreadMessageCounts(userId);
+    return this.messageService.getMessages(conversationId, userId);
   }
 }
