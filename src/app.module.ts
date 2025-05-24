@@ -9,6 +9,7 @@ import { MessagesModule } from './messages/messages.module';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ConversationModule } from './conversation/conversation.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     MessagesModule,
     FriendsModule,
     ChatModule,
+    ConversationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
