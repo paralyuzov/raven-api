@@ -12,6 +12,7 @@ import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { RefreshToken } from './schemas/refresh-token.schema';
 import { v4 as uuidv4 } from 'uuid';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -133,5 +134,54 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     return user;
+  }
+
+  async updateProfile(userId: string, updateData: UpdateProfileDto) {
+    const { firstName, lastName, nickname, email, avatar } = updateData;
+
+    if (nickname) {
+      const existingUser = await this.userModel.findOne({
+        nickname,
+        _id: { $ne: userId },
+      });
+      if (existingUser) {
+        throw new BadRequestException('Nickname already exists');
+      }
+    }
+
+    if (email) {
+      const existingUser = await this.userModel.findOne({
+        email,
+        _id: { $ne: userId },
+      });
+      if (existingUser) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
+
+    const updatedUser = await this.userModel.findByIdAndUpdate(
+      userId,
+      {
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(nickname && { nickname }),
+        ...(email && { email }),
+        ...(avatar && { avatar }),
+      },
+      { new: true },
+    );
+
+    if (!updatedUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      _id: updatedUser._id,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      nickname: updatedUser.nickname,
+      email: updatedUser.email,
+      avatar: updatedUser.avatar || '',
+    };
   }
 }
