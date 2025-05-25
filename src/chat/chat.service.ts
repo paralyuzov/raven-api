@@ -83,6 +83,35 @@ export class ChatService {
     return message;
   }
 
+  async sendMediaMessage(
+    senderId: string,
+    conversationId: string,
+    fileUrl: string,
+    type: MessageType,
+    originalFileName: string,
+    fileSize: number,
+    mimeType: string,
+  ): Promise<Message> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    if (!conversation.participants.some((id) => id.toString() === senderId)) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+    const message = await this.messageModel.create({
+      conversationId,
+      senderId,
+      content: fileUrl,
+      type,
+      originalFileName,
+      fileSize,
+      mimeType,
+    });
+    return message;
+  }
+
   async getOnlineFriendIds(userId: string): Promise<string[]> {
     try {
       const friendIds = await this.friendService.getFriendIds(userId);
