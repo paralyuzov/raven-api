@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: chat-api
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: chat-api
+          property: port
+    # Add your environment variables in Render dashboard:
+    # - MONGODB_URI (your MongoDB Atlas connection string)
+    # - JWT_SECRET (your production JWT secret)
+    # - JWT_EXPIRES_IN (24h)
+    # - JWT_REFRESH_SECRET (your production refresh JWT secret)
+    # - JWT_REFRESH_EXPIRES_IN (7d)
+    # - FRONTEND_URL (your frontend domain)
