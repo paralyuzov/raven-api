@@ -30,6 +30,15 @@ export class Message extends Document {
   type: MessageType;
 
   @Prop()
+  originalFileName?: string;
+
+  @Prop()
+  fileSize?: number;
+
+  @Prop()
+  mimeType?: string;
+
+  @Prop()
   createdAt?: Date;
 
   @Prop()
