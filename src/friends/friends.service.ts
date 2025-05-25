@@ -10,12 +10,17 @@ import { Friend, FriendStatus } from './schemas/friend.schema';
 import { User } from '../auth/schemas/user.schema';
 import { FriendRequestDto } from './dto/friend-request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Message } from '../messages/schemas/message.schema';
+import { Conversation } from '../conversation/schemas/conversation.schema';
 
 @Injectable()
 export class FriendsService {
   constructor(
     @InjectModel(Friend.name) private friendModel: Model<Friend>,
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Message.name) private messageModel: Model<Message>,
+    @InjectModel(Conversation.name)
+    private conversationModel: Model<Conversation>,
     private eventEmitter: EventEmitter2,
   ) {}
 
@@ -117,6 +122,11 @@ export class FriendsService {
     }
 
     await this.friendModel.deleteOne({ _id: friendRequest._id });
+
+    this.eventEmitter.emit('friendship.updated', {
+      user1: data.userId,
+      user2: data.receiverId,
+    });
 
     return friendRequest;
   }
@@ -243,6 +253,46 @@ export class FriendsService {
       )
       .lean();
 
-    return friendUsers;
+    const friendsWithUnreadCounts = await Promise.all(
+      friendUsers.map(async (friend) => {
+        const unreadCount = await this.getUnreadMessageCount(
+          userId,
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
+          friend._id.toString(),
+        );
+        return {
+          ...friend,
+          unreadCount,
+        };
+      }),
+    );
+
+    return friendsWithUnreadCounts;
+  }
+
+  async getUnreadMessageCount(
+    userId: string,
+    friendId: string,
+  ): Promise<number> {
+    try {
+      const conversation = await this.conversationModel.findOne({
+        participants: { $all: [userId, friendId] },
+      });
+
+      if (!conversation) {
+        return 0;
+      }
+
+      const unreadCount = await this.messageModel.countDocuments({
+        conversationId: conversation._id,
+        senderId: friendId,
+        read: false,
+      });
+
+      return unreadCount;
+    } catch (error) {
+      console.error('Error getting unread message count:', error);
+      return 0;
+    }
   }
 }
