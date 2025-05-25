@@ -10,6 +10,8 @@ import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConversationModule } from './conversation/conversation.module';
+import { UsersModule } from './users/users.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { ConversationModule } from './conversation/conversation.module';
     FriendsModule,
     ChatModule,
     ConversationModule,
+    UsersModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
