@@ -26,7 +26,8 @@ async function bootstrap() {
     origin: process.env.FRONTEND_URL || '*',
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap().catch((err) => {
   console.error('Error starting the application:', err);
