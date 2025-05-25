@@ -11,12 +11,14 @@ import {
   Conversation,
   ConversationSchema,
 } from '../conversation/schemas/conversation.schema';
+import { User, UserSchema } from '../auth/schemas/user.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     MessagesModule,
     FriendsModule,
