@@ -39,6 +39,10 @@ export class ChatService {
     return this.connectedUsers.has(userId);
   }
 
+  getUserSocketId(userId: string): string | undefined {
+    return this.connectedUsers.get(userId);
+  }
+
   // Join a conversation: check if user is a participant
   async joinConversation(
     conversationId: string,
@@ -87,6 +91,78 @@ export class ChatService {
     } catch (error) {
       this.logger.error(`Error getting online friends: ${error}`);
       return [];
+    }
+  }
+
+  async getFriendIds(userId: string): Promise<string[]> {
+    try {
+      return await this.friendService.getFriendIds(userId);
+    } catch (error) {
+      this.logger.error(`Error getting friend IDs: ${error}`);
+      return [];
+    }
+  }
+
+  getConnectedUsers(): Map<string, string> {
+    return this.connectedUsers;
+  }
+
+  async getConversationById(
+    conversationId: string,
+  ): Promise<Conversation | null> {
+    try {
+      return await this.conversationModel.findById(conversationId);
+    } catch (error) {
+      this.logger.error(`Error getting conversation: ${error}`);
+      return null;
+    }
+  }
+
+  async getUnreadMessageCount(
+    userId: string,
+    friendId: string,
+  ): Promise<number> {
+    try {
+      const conversation = await this.conversationModel.findOne({
+        participants: { $all: [userId, friendId] },
+      });
+
+      if (!conversation) {
+        return 0;
+      }
+
+      const unreadCount = await this.messageModel.countDocuments({
+        conversationId: conversation._id,
+        senderId: friendId,
+        read: false,
+      });
+
+      return unreadCount;
+    } catch (error) {
+      this.logger.error(`Error getting unread message count: ${error}`);
+      return 0;
+    }
+  }
+
+  async markMessagesAsRead(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      await this.messageModel.updateMany(
+        {
+          conversationId,
+          senderId: { $ne: userId },
+          read: false,
+        },
+        { read: true },
+      );
+
+      this.logger.log(
+        `Marked messages as read for user ${userId} in conversation ${conversationId}`,
+      );
+    } catch (error) {
+      this.logger.error(`Error marking messages as read: ${error}`);
     }
   }
 }
