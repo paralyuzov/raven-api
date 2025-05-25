@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuthGuard } from '../guards/auth.guard';
 import { GetUser } from '../decorators/get-user.decorator';
 
@@ -44,6 +45,22 @@ export class AuthController {
         email: user.email,
         avatar: user.avatar || '',
       },
+    };
+  }
+
+  @Put('profile')
+  @UseGuards(AuthGuard)
+  async updateProfile(
+    @GetUser('_id') userId: string,
+    @Body() updateData: UpdateProfileDto,
+  ) {
+    const updatedUser = await this.authService.updateProfile(
+      userId,
+      updateData,
+    );
+    return {
+      message: 'Profile updated successfully',
+      user: updatedUser,
     };
   }
 }
