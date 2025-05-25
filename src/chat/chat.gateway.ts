@@ -11,6 +11,9 @@ import { Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WsAuthGuard } from '../guards/ws-auth.guard';
 import { OnEvent } from '@nestjs/event-emitter';
 import { MessageType } from '../messages/schemas/message.schema';
+import { InjectModel } from '@nestjs/mongoose';
+import { User } from '../auth/schemas/user.schema';
+import { Model } from 'mongoose';
 
 interface AuthenticatedSocket extends Socket {
   data: {
@@ -27,6 +30,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly chatService: ChatService,
     private readonly wsAuthGuard: WsAuthGuard,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
 
   private isClientAuthenticated(client: AuthenticatedSocket): boolean {
@@ -208,6 +212,76 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('send_media_message')
+  async handleSendMediaMessage(
+    client: AuthenticatedSocket,
+    payload: {
+      conversationId: string;
+      fileUrl: string;
+      type: 'image' | 'video';
+      originalFileName: string;
+      fileSize: number;
+      mimeType: string;
+    },
+  ): Promise<void> {
+    if (!this.isClientAuthenticated(client)) {
+      this.sendAuthenticationError(client);
+      return;
+    }
+
+    const senderId = client.data.userId;
+    const {
+      conversationId,
+      fileUrl,
+      type,
+      originalFileName,
+      fileSize,
+      mimeType,
+    } = payload;
+
+    try {
+      const messageType =
+        type === 'image' ? MessageType.IMAGE : MessageType.VIDEO;
+
+      const message = await this.chatService.sendMediaMessage(
+        senderId,
+        conversationId,
+        fileUrl,
+        messageType,
+        originalFileName,
+        fileSize,
+        mimeType,
+      );
+
+      const messageData = {
+        id: message._id,
+        conversationId,
+        senderId,
+        content: fileUrl,
+        type: messageType,
+        originalFileName,
+        fileSize,
+        mimeType,
+        timestamp: message.createdAt?.toISOString(),
+      };
+
+      this.server
+        .to(`conversation:${conversationId}`)
+        .emit('new_message', messageData);
+
+      client.emit('message_sent', {
+        id: message._id,
+        conversationId,
+        timestamp: message.createdAt?.toISOString(),
+      });
+
+      await this.notifyUnreadCountUpdate(conversationId, senderId);
+    } catch (error) {
+      this.logger.error('Error sending media message', error);
+      client.emit('error', { message: 'Failed to send media message' });
+    }
+  }
+
   @SubscribeMessage('get_friend_status')
   async handleGetFriendStatus(
     client: AuthenticatedSocket,
@@ -241,28 +315,47 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @OnEvent('friend.request.created')
-  handleFriendRequestCreated(payload: {
+  async handleFriendRequestCreated(payload: {
     type: string;
     receiverId: string;
     senderId: string;
-  }): void {
+  }): Promise<void> {
     const { receiverId, senderId } = payload;
 
-    const isReceiverOnline = this.chatService.isUserOnline(receiverId);
-    if (isReceiverOnline) {
-      this.logger.log(
-        ` Receiver ${receiverId} is online, sending socket event`,
-      );
-    } else {
-      this.logger.log(
-        ` Receiver ${receiverId} is offline, event will be missed`,
-      );
-    }
+    try {
+      const sender = await this.userModel.findById(senderId, {
+        _id: 1,
+        nickname: 1,
+        firstName: 1,
+        lastName: 1,
+      });
 
-    this.server.to(`user:${receiverId}`).emit('refresh_friend_requests', {
-      action: 'FRIEND_REQUEST_RECEIVED',
-      senderId,
-    });
+      if (!sender) {
+        this.logger.error(`Sender with ID ${senderId} not found`);
+        return;
+      }
+
+      const isReceiverOnline = this.chatService.isUserOnline(receiverId);
+      if (isReceiverOnline) {
+        this.logger.log(
+          ` Receiver ${receiverId} is online, sending socket event`,
+        );
+      } else {
+        this.logger.log(
+          ` Receiver ${receiverId} is offline, event will be missed`,
+        );
+      }
+
+      this.server.to(`user:${receiverId}`).emit('refresh_friend_requests', {
+        message: `${sender.nickname || sender.firstName} sent you a friend request`,
+        sender: {
+          id: senderId,
+          username: sender.nickname || sender.firstName,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Error handling friend request created:', error);
+    }
   }
 
   @OnEvent('friendship.updated')
